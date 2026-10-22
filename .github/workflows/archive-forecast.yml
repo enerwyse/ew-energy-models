@@ -1,10 +1,12 @@
 name: archive-ieso-forecast
 
-# Builds the open IESO forecast archive: IESO deletes forecasts after ~90 days.
+# Builds the open IESO forecast archive. IESO keeps every forecast version for
+# only ~45 days, so this runs daily; each run back-fills anything still in
+# IESO's window, then fails (and GitHub emails you) if any date is missing.
 on:
   schedule:
-    - cron: "17 14 * * *"   # ~09:17 EST, after the morning revision
-    - cron: "47 20 * * *"   # ~15:47 EST, after the afternoon revision
+    - cron: "17 14 * * *"   # ~09:17 EST
+    - cron: "47 21 * * *"   # ~16:47 EST, after the afternoon day-ahead revision
   workflow_dispatch:
 
 permissions:
@@ -15,7 +17,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  snapshot:
+  archive:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,11 +25,14 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e .
-      - run: python scripts/archive_ieso_forecast.py data/ieso_forecast_archive.csv
-      - name: Commit snapshot
+      - name: Back-fill new forecast versions
+        run: python scripts/archive_ieso_forecast.py --skip-check
+      - name: Commit
         run: |
           git config user.name "ew-archive-bot"
           git config user.email "actions@users.noreply.github.com"
           git add data/ieso_forecast_archive.csv
-          git diff --cached --quiet || git commit -m "data: IESO forecast snapshot $(date -u +%FT%H:%MZ)"
+          git diff --cached --quiet || git commit -m "data: IESO forecast archive $(date -u +%FT%H:%MZ)"
           git push
+      - name: Gap check (fails -> email alert)
+        run: python scripts/archive_ieso_forecast.py --check-only

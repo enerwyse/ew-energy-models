@@ -118,6 +118,10 @@ public demand data are provisional until the IESO publishes the official ones.
 PDFs computed with Ontario Demand as the denominator are estimates. Your LDC or
 IESO invoice is authoritative. Nothing here is financial or regulatory advice.
 
+## Maintenance
+
+See [MAINTENANCE.md](MAINTENANCE.md) for the runbook: weekly checks, alerts, yearly updates, releases.
+
 ## License & citation
 
 Apache-2.0. If you use this in research, please cite it (see `CITATION.cff`).
