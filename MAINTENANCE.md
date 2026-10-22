@@ -16,8 +16,12 @@ git pull            # always first: the archive bot commits to main twice a day
 ## One-time setup
 
 1. **Push the repo** to `github.com/enerwyse/ew-energy-models` (public).
-2. **Allow the bot to commit:** GitHub → repo **Settings → Actions → General →
-   Workflow permissions → "Read and write permissions"** → Save.
+2. **Bot commit permission: nothing to change.** Keep the repo/org default at
+   *read-only* (safer). The archive workflow requests `contents: write` in its own
+   file, which is all it needs. Only if its **Commit** step fails with a 403: go to
+   **github.com/enerwyse → Settings → Actions → General → Workflow permissions →
+   "Read and write permissions" → Save** (org level; the repo option is greyed out
+   because the org setting caps it).
 3. **Turn on failure emails:** GitHub (your avatar) → **Settings → Notifications →
    Actions → "Send notifications for failed workflows only"**, with email enabled.
 4. **First archive run:** repo → **Actions → archive-ieso-forecast → Run workflow**.
@@ -41,7 +45,7 @@ The failure tells you which step broke. Open the run in the **Actions** tab.
 | **Gap check** | Recent dates are missing a day-ahead forecast | Click **Re-run all jobs**. Missing dates are recoverable for about 40 days, so you have time, but don't leave it. |
 | **Back-fill** with an HTTP / timeout error | IESO site was down | Ignore it once. The next run heals it. If it fails for 3+ days, investigate. |
 | **Back-fill** with `no ForecastOntDemand/AverageDemand series found` or a parse error | **IESO changed its report format** | See "IESO changed a format" below. |
-| **Commit** with a permission error | Bot can't push | Redo one-time setup step 2. |
+| **Commit** with a permission error (403) | Org blocks workflow writes | Org-level fix in one-time setup step 2. |
 
 If anything fails for more than a week, open a Claude session in the Enerwyse
 project, paste the error, and ask for a fix.
