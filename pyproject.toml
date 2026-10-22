@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ew-energy-models"
+version = "0.1.0"
+description = "Open, auditable energy-analytics models from Enerwyse: load analytics, M&V baselines, and Ontario Global Adjustment / ICI peak tools. Every result ships with an evidence receipt."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.10"
+authors = [{ name = "Enerwyse", email = "tirth.shah@enerwyse.ca" }]
+keywords = ["energy", "ontario", "ieso", "global-adjustment", "ici", "measurement-and-verification", "emis", "ashrae-guideline-14"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering",
+]
+dependencies = ["numpy>=1.24", "pandas>=2.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+plot = ["matplotlib>=3.7"]
+
+[project.urls]
+Homepage = "https://enerwyse.ca"
+Source = "https://github.com/enerwyse/ew-energy-models"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ewmodels"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
