@@ -20,7 +20,7 @@ def demand() -> pd.Series:
     Ontario demand, smooth enough that only the planted hours exceed 22,000 MW."""
     idx = pd.date_range("2023-05-01", "2025-05-01", freq="1h", inclusive="left", tz=EST)
     h = idx.hour.to_numpy()
-    doy = idx.dayofyear.to_numpy()
+    doy = idx.day_of_year.to_numpy()
     rng = np.random.default_rng(42)
     base = 15000 + 2500 * np.sin((h - 6) / 24 * 2 * np.pi) + 1500 * np.cos((doy - 200) / 365 * 2 * np.pi)
     s = pd.Series(base + rng.normal(0, 100, len(idx)), index=idx, name="ontario_demand_mw")

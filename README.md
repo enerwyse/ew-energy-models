@@ -35,14 +35,15 @@ take it on trust. We think the math should be open and every figure should be
 checkable. The value a platform adds is applying the math reliably to real
 operations, not hiding it.
 
-## What's in v0.1: Ontario ICI toolkit
+## What's in v0.2: Ontario ICI toolkit
 
 | Module | What it does |
 |---|---|
-| `ewmodels.data.ieso` | Downloads and parses IESO hourly Ontario demand. Converts hour-ending EST to interval-start timestamps. Caches locally. |
+| `ewmodels.data.ieso` | Downloads and parses IESO hourly Ontario demand and the **ICI Demand** reports. Converts hour-ending EST to interval-start timestamps. Caches locally. |
+| `ewmodels.data.ieso_forecast` | Parses IESO's Ontario demand forecasts (Adequacy3) and keeps an **open forecast archive** |
 | `ewmodels.ontario.ici` | Base periods, top-5 peak hours, **Peak Demand Factor** from interval meter data, GA charge, an optional **clean-energy PPA offset**, and curtailment-savings simulation |
 | `ewmodels.ontario.atlas` | **Ontario Peak Atlas**: per-season thresholds, peak timing, and *crowding*, i.e. how many days came within 1–5% of the 5th peak |
-| `ewmodels.ontario.benchmark` | **Open 5CP benchmark**: replays history day by day with no look-ahead and scores any peak-calling strategy on *peaks captured vs. days curtailed*, under configurable forecast error |
+| `ewmodels.ontario.benchmark` | **Open 5CP benchmark**: replays history day by day with no look-ahead and scores any peak-calling strategy on *peaks captured vs. days curtailed*. Supports synthetic or real forecasts, hour-level scoring with a curtailment window, window-length analysis, and a **growth-removed stress test** |
 
 ### The open 5CP benchmark
 
@@ -63,6 +64,23 @@ print(result.value)   # per base period: days_called, peak_hours_captured, captu
 Any function `DayContext -> bool` is a strategy, so you can plug in your own
 forecaster and compare it on the same terms.
 
+**Two honesty guards are built in:**
+
+- **Stress test.** Ontario's peak has grown every recent season, which flatters any
+  rule anchored on last year's peaks. `normalize_seasons()` removes that growth, so
+  a strategy has to work in a flat year too.
+- **Real windows.** All five peak hours usually fall on one afternoon, as
+  consecutive hours. `window=(start, hours)` scores what a fixed curtailment window
+  actually catches, and `window_coverage()` shows how long the window has to be.
+
+### The open IESO forecast archive
+
+IESO keeps its Ontario demand forecasts for only about 90 days, so no public
+record exists of what was forecast against what happened. This repo builds one:
+a scheduled workflow snapshots IESO's forecasts twice a day into
+`data/ieso_forecast_archive.csv`. Once a full ICI season is archived, the
+benchmark can score strategies on the forecasts operators actually saw.
+
 ## Design principles
 
 1. **Receipts, not just results.** Checks fail loudly: for example, a missing meter
@@ -79,8 +97,8 @@ forecaster and compare it on the same terms.
 
 The library will grow to cover the Enerwyse models catalogue:
 
-- **v0.2 Load kernels:** load-profile decomposition, peak ranking, load factor
-- **v0.3 M&V:** ASHRAE Guideline 14 change-point baselines (3P/4P/5P), weather
+- **v0.3 Load kernels:** load-profile decomposition, peak ranking, load factor
+- **v0.4 M&V:** ASHRAE Guideline 14 change-point baselines (3P/4P/5P), weather
   normalization, CUSUM tracking, with CV(RMSE)/NMBE validity in the receipt
 - **Later:** day-ahead load forecasting, load-shifting optimization, and
   carbon-intensity scheduling

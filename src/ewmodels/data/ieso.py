@@ -21,6 +21,7 @@ import pandas as pd
 
 EST = "Etc/GMT+5"  # fixed UTC-05:00 (POSIX sign convention is inverted)
 DEMAND_URL = "https://reports-public.ieso.ca/public/Demand/PUB_Demand_{year}.csv"
+ICI_DEMAND_URL = "https://reports-public.ieso.ca/public/ICIDemand/PUB_ICIDemand_{year}.csv"
 _COLS = {"market demand": "market_demand_mw", "ontario demand": "ontario_demand_mw"}
 
 
@@ -35,40 +36,68 @@ def parse_demand_csv(text: str) -> pd.DataFrame:
         raise ValueError("no 'Date,Hour,...' header found; IESO report format may have changed")
     df = pd.read_csv(io.StringIO("\n".join(lines[header_i:])))
     df.columns = [c.strip().lower() for c in df.columns]
-    missing = {"date", "hour", *_COLS} - set(df.columns)
+    missing = {"date", "hour", "ontario demand"} - set(df.columns)
     if missing:
         raise ValueError(f"IESO demand report missing columns: {sorted(missing)}")
+    cols = [c for c in _COLS if c in df.columns]  # Market Demand is absent in ICIDemand files
     hour = pd.to_numeric(df["hour"], errors="raise").astype(int)
     if not hour.between(1, 24).all():
         raise ValueError("hour column outside 1..24 (expected hour-ending convention)")
     start = pd.to_datetime(df["date"]) + pd.to_timedelta(hour - 1, unit="h")
-    out = df[list(_COLS)].rename(columns=_COLS).astype(float)
+    out = df[cols].rename(columns=_COLS).astype(float)
     out.index = pd.DatetimeIndex(start).tz_localize(EST)
     out.index.name = "interval_start_est"
     out["hour_ending"] = hour.values
     return out.sort_index()
 
 
+def _fetch_text(url: str) -> str:
+    with urllib.request.urlopen(url, timeout=60) as r:
+        return r.read().decode("utf-8-sig")
+
+
+def _cached(url: str, path: Path | None, final: bool) -> str:
+    if path and final and path.exists():
+        return path.read_text()
+    text = _fetch_text(url)
+    if path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    return text
+
+
 def fetch_demand(years: Iterable[int], cache_dir: str | Path | None = "~/.cache/ewmodels/ieso") -> pd.DataFrame:
-    """Download (or read cached) PUB_Demand files and return one hourly frame.
+    """Download (or read cached) calendar-year PUB_Demand files as one hourly frame.
 
     The current year's file is always re-downloaded since IESO appends to it.
     """
     from datetime import date
 
-    frames = []
     cache = Path(cache_dir).expanduser() if cache_dir else None
-    if cache:
-        cache.mkdir(parents=True, exist_ok=True)
+    frames = []
     for year in sorted(set(years)):
         path = cache / f"PUB_Demand_{year}.csv" if cache else None
-        if path and path.exists() and year < date.today().year:
-            text = path.read_text()
-        else:
-            with urllib.request.urlopen(DEMAND_URL.format(year=year), timeout=60) as r:
-                text = r.read().decode("utf-8-sig")
-            if path:
-                path.write_text(text)
-        frames.append(parse_demand_csv(text))
+        frames.append(parse_demand_csv(_cached(DEMAND_URL.format(year=year), path, year < date.today().year)))
+    df = pd.concat(frames)
+    return df[~df.index.duplicated(keep="last")].sort_index()
+
+
+def fetch_ici_demand(base_period_years: Iterable[int],
+                     cache_dir: str | Path | None = "~/.cache/ewmodels/ieso") -> pd.DataFrame:
+    """IESO's ICI Ontario Demand reports — the demand series published for ICI
+    peak determination. File year Y covers base period May 1 Y – Apr 30 Y+1.
+
+    Use this to cross-check peaks reproduced from PUB_Demand. A file is cached
+    permanently only once its base period has closed (after May 31 of Y+1).
+    """
+    from datetime import date
+
+    cache = Path(cache_dir).expanduser() if cache_dir else None
+    today = date.today()
+    frames = []
+    for y in sorted(set(base_period_years)):
+        path = cache / f"PUB_ICIDemand_{y}.csv" if cache else None
+        final = today > date(y + 1, 5, 31)
+        frames.append(parse_demand_csv(_cached(ICI_DEMAND_URL.format(year=y), path, final)))
     df = pd.concat(frames)
     return df[~df.index.duplicated(keep="last")].sort_index()

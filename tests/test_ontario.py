@@ -103,3 +103,53 @@ def test_vectorized_curve_matches_replay(demand):
         fast = benchmark.tradeoff_curve(demand, margins=(m,), forecast_errors_pct=(err,), seeds=[seed])
         assert fast.mean_days_called.iloc[0] == slow.days_called.mean()
         assert fast.mean_capture_rate.iloc[0] == slow.capture_rate.mean()
+
+
+# ---- v0.2: windows, stress test, real-forecast input
+
+def test_window_scoring(demand):
+    # 2023-2024 planted peaks start at 15:00-17:00 EST; 2024-2025 at 16:00-17:00
+    always = lambda ctx: True
+    narrow = benchmark.evaluate(demand, always, window=(16, 1)).value.set_index("base_period")
+    assert narrow.loc["2023-2024", "peak_hours_captured"] == 2   # the two 16:00 peaks
+    wide = benchmark.evaluate(demand, always, window=(15, 3)).value
+    assert (wide.capture_rate == 1.0).all()
+    fast = benchmark.tradeoff_curve(demand, margins=(0.99,), forecast_errors_pct=(0.0,), window=(16, 1))
+    assert fast.mean_capture_rate.iloc[0] == narrow.capture_rate.mean()
+
+
+def test_window_coverage(demand):
+    wc = benchmark.window_coverage(demand, lengths=[1, 3]).set_index("hours")
+    assert wc.loc[3, "capture_rate"] == 1.0 and wc.loc[3, "best_start_est"] == 15
+    assert wc.loc[3, "seasons_fully_covered"] == "2/2"
+    assert wc.loc[3, "local_daylight_window"] == "16:00–19:00"
+    assert wc.loc[1, "capture_rate"] < 1.0
+
+
+def test_normalize_seasons_removes_growth(demand):
+    grown = demand.copy()
+    second = grown.index >= pd.Timestamp("2024-05-01", tz=EST)
+    grown[second] *= 1.10
+    norm = benchmark.normalize_seasons(grown, method="mean")
+    labels = norm.value.index.map(ici.base_period_label)
+    means = norm.value.groupby(labels).mean()
+    assert means.iloc[0] == pytest.approx(means.iloc[1], rel=1e-9)
+    # peak *dates* are unchanged by per-season scaling
+    a = ici.top_peak_hours(grown).value.interval_start.tolist()
+    b = ici.top_peak_hours(norm.value).value.interval_start.tolist()
+    assert a == b
+    thr = benchmark.normalize_seasons(grown, method="threshold").value
+    t = ici.top_peak_hours(thr).value.query("rank == 5").demand_mw
+    assert t.iloc[0] == pytest.approx(t.iloc[1])
+
+
+def test_real_forecast_input(demand):
+    days = atlas.daily_peaks(demand)
+    perfect = days["peak_mw"]
+    a = benchmark.evaluate(demand, benchmark.threshold_strategy(0.02), forecast_peak_mw=perfect)
+    b = benchmark.evaluate(demand, benchmark.threshold_strategy(0.02))
+    pd.testing.assert_frame_equal(a.value, b.value)
+    assert a.receipt.valid
+    partial = perfect.iloc[: len(perfect) // 2]
+    c = benchmark.evaluate(demand, benchmark.threshold_strategy(0.02), forecast_peak_mw=partial)
+    assert not c.receipt.valid  # forecast_coverage check fails
