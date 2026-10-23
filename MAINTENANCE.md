@@ -3,11 +3,15 @@
 Expected effort: **2 minutes a week, 15 minutes a month, about 2 hours each May.**
 The forecast archive runs and heals itself. Your job is to notice when it can't.
 
-All commands run from the repo folder with the virtual environment active:
+All commands run from the repo folder with the virtual environment active.
+The environment lives outside the repo, in `~/.venvs/ew-energy-models`, because
+iCloud Desktop sync marks files inside an in-repo `.venv` as hidden and Python 3.13
+then ignores them ("No module named 'ewmodels'"). To recreate it:
+`python3 -m venv ~/.venvs/ew-energy-models && source ~/.venvs/ew-energy-models/bin/activate && pip install -e ".[dev,plot]"`
 
 ```bash
 cd ~/Desktop/"Tirth Private"/ew-energy-models
-source .venv/bin/activate
+source ~/.venvs/ew-energy-models/bin/activate
 git pull            # always first: the archive bot commits to main twice a day
 ```
 
@@ -26,8 +30,13 @@ git pull            # always first: the archive bot commits to main twice a day
    Actions → "Send notifications for failed workflows only"**, with email enabled.
 4. **First archive run:** repo → **Actions → archive-ieso-forecast → Run workflow**.
    It should finish green and commit `data/ieso_forecast_archive.csv`.
-5. **Reserve the PyPI name** (5 min): create an account at pypi.org, then
-   `pip install build twine && python -m build && twine upload dist/*`.
+5. **Connect PyPI (Trusted Publishing, so no tokens are stored):**
+   pypi.org → **Your account → Publishing → Add a new pending publisher → GitHub**:
+   PyPI project name `ew-energy-models` · Owner `enerwyse` · Repository `ew-energy-models` ·
+   Workflow name `publish.yml` · Environment name `pypi` → **Add**.
+   Then GitHub repo → **Settings → Environments → New environment** → name `pypi` →
+   under *Deployment protection rules* tick **Required reviewers** and add yourself → Save.
+   First publish: create the `v0.2.0` release (see "Releasing a new version", steps 3–5).
 6. Add a calendar reminder: **first Monday of each month, "ew-models check"**, and
    **May 15, "ICI season update"**.
 
@@ -89,13 +98,16 @@ The base period closes April 30. IESO publishes the final ICI demand file in ear
 1. Update the version in **three places**: `pyproject.toml`, `src/ewmodels/__init__.py`,
    `CITATION.cff` (plus `date-released`).
 2. `pytest -q` must pass.
-3. Commit, then tag:
+3. Commit and push:
    ```bash
-   git commit -am "vX.Y.Z: <what changed>"
-   git tag vX.Y.Z && git push && git push --tags
+   git pull && git commit -am "vX.Y.Z: <what changed>" && git push
    ```
-4. Publish: `rm -rf dist && python -m build && twine upload dist/*`
-5. GitHub → **Releases → Draft a new release** from the tag, with 3–5 lines on what's new.
+4. GitHub → **Releases → Draft a new release** → *Choose a tag* → type `vX.Y.Z`
+   (create new tag on publish) → title `vX.Y.Z` → 3–5 lines on what's new → **Publish release**.
+5. **Actions → publish-to-pypi**: it runs tests, checks the tag matches the version,
+   builds, then waits for your approval (the `pypi` environment). Click
+   **Review deployments → Approve**. It's live at pypi.org/project/ew-energy-models
+   about a minute later. You never upload by hand.
 
 ## IESO changed a format
 

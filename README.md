@@ -35,7 +35,30 @@ take it on trust. We think the math should be open and every figure should be
 checkable. The value a platform adds is applying the math reliably to real
 operations, not hiding it.
 
-## What's in v0.2: Ontario ICI toolkit
+## Facility load analytics (v0.3)
+
+Three models for any interval meter (5-, 15- or 60-minute; resolution is detected):
+
+| Function | Catalogue model | What it tells you |
+|---|---|---|
+| `load.load_profile()` | 1 | Baseload (P10), typical (P50) and high load (P90); the weekday and weekend daily shape; **always-on share**, the fraction of energy used even when the site is idle |
+| `load.rank_peaks()` | 2 | The top-N demand peaks, when they cluster, and, given system peak hours such as Ontario's ICI hours, the **coincidence factor** (how close the site runs to its own maximum when the grid peaks) |
+| `load.load_factor()` | 5 | Monthly load factor with coverage checks |
+
+```python
+from ewmodels import load
+from ewmodels.ontario import ici
+
+profile = load.load_profile(meter_kwh)                 # meter_kwh: kWh per interval, tz-aware index
+peaks = load.rank_peaks(meter_kwh, system_peak_hours=ici_hours)
+print(profile.value["summary"]["always_on_share"], peaks.value["coincidence"]["coincidence_factor"])
+```
+
+`examples/office_load_analytics.py` runs all three on real office buildings from the open
+[Building Data Genome Project 2](https://github.com/buds-lab/building-data-genome-project-2)
+(Miller et al., 2020, CC BY 4.0), downloaded at runtime.
+
+## Ontario ICI toolkit (v0.2)
 
 | Module | What it does |
 |---|---|
@@ -97,7 +120,7 @@ benchmark can score strategies on the forecasts operators actually saw.
 
 The library will grow to cover the Enerwyse models catalogue:
 
-- **v0.3 Load kernels:** load-profile decomposition, peak ranking, load factor
+- ✅ **v0.3 Load kernels:** load-profile decomposition, peak ranking, load factor
 - **v0.4 M&V:** ASHRAE Guideline 14 change-point baselines (3P/4P/5P), weather
   normalization, CUSUM tracking, with CV(RMSE)/NMBE validity in the receipt
 - **Later:** day-ahead load forecasting, load-shifting optimization, and

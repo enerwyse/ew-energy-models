@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ew-energy-models"
-version = "0.2.0"
+version = "0.3.0"
 description = "Open, auditable energy-analytics models from Enerwyse: load analytics, M&V baselines, and Ontario Global Adjustment / ICI peak tools. Every result ships with an evidence receipt."
 readme = "README.md"
 license = "Apache-2.0"
@@ -35,3 +35,6 @@ packages = ["src/ewmodels"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["data/", "out/", ".github/", "ci/"]
