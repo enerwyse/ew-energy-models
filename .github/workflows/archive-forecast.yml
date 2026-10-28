@@ -1,8 +1,9 @@
 name: archive-ieso-forecast
 
-# Builds the open IESO forecast archive. IESO keeps every forecast version for
-# only ~45 days, so this runs daily; each run back-fills anything still in
-# IESO's window, then fails (and GitHub emails you) if any date is missing.
+# Builds the open IESO archives: demand forecasts (IESO keeps versions ~45 days),
+# day-ahead Ontario zonal prices (~90 days) and monthly Global Adjustment (~12 months).
+# Runs twice daily; each run back-fills anything still in IESO's window, then fails
+# (and GitHub emails you) if any recent date is missing.
 on:
   schedule:
     - cron: "17 14 * * *"   # ~09:17 EST
@@ -27,12 +28,19 @@ jobs:
       - run: pip install -e .
       - name: Back-fill new forecast versions
         run: python scripts/archive_ieso_forecast.py --skip-check
+      - name: Archive DA prices and Global Adjustment
+        if: always()
+        run: python scripts/archive_ieso_prices.py --skip-check
       - name: Commit
+        if: always()
         run: |
           git config user.name "ew-archive-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add data/ieso_forecast_archive.csv
-          git diff --cached --quiet || git commit -m "data: IESO forecast archive $(date -u +%FT%H:%MZ)"
+          git add data/
+          git diff --cached --quiet || git commit -m "data: IESO archives $(date -u +%FT%H:%MZ)"
           git push
-      - name: Gap check (fails -> email alert)
+      - name: Forecast gap check (fails -> email alert)
         run: python scripts/archive_ieso_forecast.py --check-only
+      - name: Price gap check (fails -> email alert)
+        if: always()
+        run: python scripts/archive_ieso_prices.py --check-only

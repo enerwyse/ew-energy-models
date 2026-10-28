@@ -71,6 +71,7 @@ Ontario ICI toolkit (catalogue Models 9, 10). First public release.
   (`ewmodels.resolution`).
 - Trusted Publishing to PyPI from GitHub releases.
 
-[Unreleased]: https://github.com/enerwyse/ew-energy-models/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/enerwyse/ew-energy-models/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/enerwyse/ew-energy-models/releases/tag/v0.4.0
 [0.3.0]: https://github.com/enerwyse/ew-energy-models/releases/tag/v0.3.0
 [0.2.0]: https://github.com/enerwyse/ew-energy-models/releases/tag/v0.2.0
