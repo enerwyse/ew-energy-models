@@ -95,3 +95,29 @@ def load_buildings(building_ids: list[str], cache_dir: str | Path = "~/.cache/ew
 
 def electricity_columns(cache_dir: str | Path = "~/.cache/ewmodels/bdg2") -> list[str]:
     return [c for c in pd.read_csv(electricity_path(cache_dir), nrows=0).columns if c != "timestamp"]
+
+
+WEATHER = "weather/weather.csv"
+
+
+def load_weather(site_ids: list[str], cache_dir: str | Path = "~/.cache/ewmodels/bdg2") -> dict[str, pd.Series]:
+    """Hourly outdoor air temperature (degC) for BDG2 sites, timezone-aware.
+
+    BDG2 weather comes from airport stations near each site (column
+    `airTemperature`). Each site's timezone is taken from its buildings' metadata.
+    """
+    meta = metadata(cache_dir)
+    w = pd.read_csv(_download(WEATHER, Path(cache_dir).expanduser()),
+                    usecols=["timestamp", "site_id", "airTemperature"], parse_dates=["timestamp"])
+    out = {}
+    for site in site_ids:
+        tzs = meta.loc[meta["site_id"] == site, "timezone"].dropna().unique()
+        if len(tzs) == 0:
+            raise ValueError(f"no timezone in BDG2 metadata for site {site}")
+        tz = _LEGACY_TZ.get(tzs[0], tzs[0])
+        sw = w[w["site_id"] == site].dropna(subset=["airTemperature"])
+        s = pd.Series(sw["airTemperature"].to_numpy(dtype=float), index=sw["timestamp"])
+        s = s[~s.index.duplicated(keep="first")].sort_index()
+        s.index = s.index.tz_localize(tz, ambiguous="NaT", nonexistent="NaT")
+        out[site] = s[s.index.notna()].rename("temp_c")
+    return out

@@ -5,8 +5,29 @@ All notable changes to `ew-energy-models`. Versions follow
 
 ## [Unreleased]
 
-- README: model status table, version history and versioning policy.
-- Added this changelog.
+## [0.4.0] - 2026-10-28
+
+Measurement & verification (catalogue Models 4, 6, 7).
+
+### Added
+- `ewmodels.mv.fit_baseline()`: 2P, 3PC, 3PH, 4P and 5P change-point baselines on daily
+  energy vs outdoor temperature, with a weekend shift, optional schedule flags
+  (`day_flags`) and model selection by BIC.
+- Baseline receipts check the BPA SEM M&V Reference Guide daily thresholds (citing ASHRAE
+  Guideline 14): CV(RMSE) < 20%, net bias < 0.5%, R² > 0.5, |t| > 1.3 on weather slopes;
+  coverage of a full year; and a **self-check**, the drift alarm run against the baseline
+  year itself.
+- `ewmodels.mv.normalized_consumption()` and `normal_year_temps()`: weather normalization.
+- `ewmodels.mv.cusum()`: drift alarm combining a tabular CUSUM (k=1, h=8) with a
+  noise-aware size filter; reports `min_detectable_pct`.
+- `ewmodels.mv.savings()`: avoided energy in a reporting period.
+- `ewmodels.data.bdg2.load_weather()`: BDG2 site weather loader.
+- `examples/office_mv_baselines.py`: all of the above on every BDG2 office with full
+  2016–2017 data.
+- README: model status table, versions and versioning policy; this changelog.
+
+### Not yet included
+- Fractional savings uncertainty.
 
 ## [0.3.0] - 2026-10-23
 

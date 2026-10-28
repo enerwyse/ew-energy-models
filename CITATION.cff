@@ -5,8 +5,8 @@ authors:
   - family-names: Shah
     given-names: Tirth
     affiliation: Enerwyse
-version: 0.3.0
-date-released: 2026-10-23
+version: 0.4.0
+date-released: 2026-10-28
 license: Apache-2.0
 repository-code: "https://github.com/enerwyse/ew-energy-models"
 url: "https://enerwyse.ca"
