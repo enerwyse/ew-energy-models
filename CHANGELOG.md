@@ -5,6 +5,24 @@ All notable changes to `ew-energy-models`. Versions follow
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-28
+
+Ontario Class A cost attribution (catalogue Model 3, re-scoped from time-of-use).
+
+### Added
+- `ewmodels.ontario.cost.peak_hour_value()`: GA dollars per MWh consumed in a base period's
+  5 peak hours, over its adjustment period.
+- `ewmodels.ontario.cost.site_pdf()`: Peak Demand Factor per base period from meter data.
+- `ewmodels.ontario.cost.bill_breakdown()`: monthly commodity bill as Class A and as Class B
+  (energy at OEMP, Global Adjustment including credits, optional delivery rates), with
+  receipt checks for month coverage, GA availability and PDF availability.
+- `ewmodels.data.ieso_prices`: parsers for IESO day-ahead Ontario zonal prices, hourly LFDA
+  and monthly Global Adjustment; `oemp()`; archive loaders.
+- Open IESO price archive: `scripts/archive_ieso_prices.py` and the scheduled workflow
+  archive day-ahead prices (IESO keeps ~90 days) and every GA file version (~12 months),
+  with gap alerts. History starts 2026-07-30 (prices) and 2025-10 (GA).
+- `examples/ontario_cost_attribution.py`: three archetype sites priced on real IESO data.
+
 ## [0.4.0] - 2026-10-28
 
 Measurement & verification (catalogue Models 4, 6, 7).
@@ -71,7 +89,8 @@ Ontario ICI toolkit (catalogue Models 9, 10). First public release.
   (`ewmodels.resolution`).
 - Trusted Publishing to PyPI from GitHub releases.
 
-[Unreleased]: https://github.com/enerwyse/ew-energy-models/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/enerwyse/ew-energy-models/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/enerwyse/ew-energy-models/releases/tag/v0.5.0
 [0.4.0]: https://github.com/enerwyse/ew-energy-models/releases/tag/v0.4.0
 [0.3.0]: https://github.com/enerwyse/ew-energy-models/releases/tag/v0.3.0
 [0.2.0]: https://github.com/enerwyse/ew-energy-models/releases/tag/v0.2.0

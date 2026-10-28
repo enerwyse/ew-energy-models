@@ -9,8 +9,9 @@
 
 `ewmodels` is a Python library of energy models for commercial and industrial
 facilities: facility load analytics, measurement and verification (M&V)
-baselines, and Ontario Global Adjustment / Industrial Conservation Initiative
-(ICI) peak tools.
+baselines, Ontario Global Adjustment / Industrial Conservation Initiative
+(ICI) peak tools, Class A cost attribution, and open archives of IESO data that
+IESO itself only keeps for weeks.
 
 Every model returns a result **and an evidence receipt**. The receipt records:
 
@@ -51,7 +52,7 @@ Numbers refer to the catalogue.
 |---|---|---|---|---|
 | 1 | Load profile decomposition (baseload, profiles, always-on share) | ✅ Released | v0.3.0 | `ewmodels.load.load_profile` |
 | 2 | Peak demand ranking and system-peak coincidence | ✅ Released | v0.3.0 | `ewmodels.load.rank_peaks` |
-| 3 | Energy cost attribution (market price + GA + delivery) | Being re-scoped | | |
+| 3 | Class A cost attribution: energy at OEMP + Global Adjustment, Class A vs Class B | ✅ Released | v0.5.0 | `ewmodels.ontario.cost` |
 | 4 | Weather-normalized consumption | ✅ Released | v0.4.0 | `ewmodels.mv.normalized_consumption` |
 | 5 | Load factor | ✅ Released | v0.3.0 | `ewmodels.load.load_factor` |
 | 6 | Change-point baselines (2P/3P/4P/5P) with validity checks and self-check | ✅ Released | v0.4.0 | `ewmodels.mv.fit_baseline` |
@@ -70,6 +71,59 @@ Numbers refer to the catalogue.
 Model 9 deliberately does not include a peak *predictor*. Our analysis found
 that the length of the curtailment window matters more than picking the day
 (see below), so the toolkit focuses on measuring that trade-off openly.
+
+## Ontario Class A cost attribution (v0.5)
+
+Class A customers don't pay time-of-use rates. Their commodity bill is energy at
+the hourly **Ontario Electricity Market Price** (OEMP = day-ahead Ontario zonal
+price + LFDA, since Market Renewal in May 2025) plus **Global Adjustment**, which
+is set for a whole July–June year by the site's load in five peak hours of the
+previous May–April.
+
+| Function | What it does |
+|---|---|
+| `ontario.cost.peak_hour_value()` | GA dollars that one MWh used in a base period's 5 peak hours cost over the following adjustment period |
+| `ontario.cost.site_pdf()` | A site's Peak Demand Factor for each base period, from its meter data |
+| `ontario.cost.bill_breakdown()` | Monthly commodity bill as Class A and as Class B: energy, GA (credits included) and optional delivery rates |
+| `data.ieso_prices` | Parsers, loaders and archivers for IESO day-ahead prices, LFDA and monthly GA; `oemp()` combines them |
+
+```python
+from ewmodels.data.ieso_prices import load_da_prices, load_ga, fetch_lfda, oemp
+from ewmodels.ontario import cost
+
+prices = oemp(load_da_prices("data/ieso_da_price_archive.csv"), fetch_lfda([2026]))
+ga = load_ga("data/ieso_ga_archive.csv")
+pdf = cost.site_pdf(meter_kwh, ontario_demand).value
+bill = cost.bill_breakdown(meter_kwh, prices, ga, pdf)
+print(bill.value[["month", "energy_dollars", "ga_class_a_dollars", "ga_class_b_dollars"]])
+```
+
+`examples/ontario_cost_attribution.py` prices three synthetic 1 MW-average sites
+on real IESO data for August–September 2026, the months with both hourly prices
+and actual GA:
+
+| Site | GA share of Class A commodity bill | Class A vs Class B |
+|---|---|---|
+| 24/7 flat load | 34% | 21% cheaper |
+| Same site, halving its load in the 5 peak hours of 2025 | 21% | 35% cheaper |
+| Two-shift weekday plant (06:00–22:00) | 45% | 0.7% cheaper |
+
+Halving load for **five hours** in June and August 2025 cut that site's
+August–September 2026 commodity bill by 17%. A site that runs flat out on summer
+afternoons gets almost nothing from Class A. And one kWh used in the 2024–25
+peak hours (all on the late afternoon and evening of June 19, 2024) cost **$27 of GA** over the
+nine months of its adjustment period with published actuals, about 480 times
+the average hourly energy price of Aug–Oct 2026. GA was also *negative* from
+December 2025 to February 2026, so Class A sites received GA credits that winter.
+
+### The open IESO price archive
+
+Since Market Renewal, IESO publishes hourly day-ahead prices only as daily files
+kept for about 90 days, and monthly GA files for about 12 months. There is no
+public yearly file. The same scheduled workflow that archives forecasts now
+archives both, into `data/ieso_da_price_archive.csv` (from July 30, 2026) and
+`data/ieso_ga_archive.csv` (from October 2025, every version, so estimates can
+be compared with actuals).
 
 ## Measurement & verification (v0.4)
 
@@ -199,6 +253,7 @@ Version 1.0.0 will mark a stable API.
 
 | Version | Date | What's in it |
 |---|---|---|
+| [0.5.0](https://github.com/enerwyse/ew-energy-models/releases/tag/v0.5.0) | 2026-10-28 | Class A cost attribution (Model 3): OEMP + Global Adjustment, Class A vs Class B, GA value of a peak-hour kWh; open IESO price and GA archive |
 | [0.4.0](https://github.com/enerwyse/ew-energy-models/releases/tag/v0.4.0) | 2026-10-28 | M&V (Models 4, 6, 7): change-point baselines with validity checks and self-check, schedule flags, weather normalization, CUSUM drift alarm |
 | [0.3.0](https://github.com/enerwyse/ew-energy-models/releases/tag/v0.3.0) | 2026-10-23 | Facility load analytics (Models 1, 2, 5); spike and meter-outage checks; Building Data Genome 2 loader |
 | [0.2.0](https://github.com/enerwyse/ew-energy-models/releases/tag/v0.2.0) | 2026-10-22 | Ontario ICI toolkit (Models 9, 10): Peak Atlas, open 5CP benchmark, IESO cross-check, open forecast archive |
@@ -206,8 +261,9 @@ Version 1.0.0 will mark a stable API.
 Full notes for each release are in [CHANGELOG.md](CHANGELOG.md).
 
 **Next.** Candidates, to be chosen by user feedback: fractional savings
-uncertainty for M&V, a longer ICI history (about 15 seasons), GA dollar
-estimates, and energy cost attribution (Model 3).
+uncertainty for M&V, a longer ICI history (about 15 seasons), anomaly detection
+on baseline residuals (Model 13), and battery sizing against ICI peak windows
+(Model 17).
 
 ## Design principles
 
@@ -246,5 +302,7 @@ yearly updates and releases.
 ## License & citation
 
 Apache-2.0. If you use this in research, please cite it (see `CITATION.cff`).
-IESO data © Independent Electricity System Operator; Building Data Genome 2 data
-by Miller et al. (CC BY 4.0). Both are fetched at runtime, not redistributed.
+IESO data © Independent Electricity System Operator, used with attribution: the
+archives in `data/` are republished from IESO public reports and are not part of
+the PyPI package. Building Data Genome 2 data by Miller et al. (CC BY 4.0) is
+fetched at runtime, not redistributed.

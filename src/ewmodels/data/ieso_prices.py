@@ -288,7 +288,7 @@ def oemp(da_ozp: pd.Series, lfda: pd.DataFrame) -> pd.DataFrame:
     so the price is the DA price alone: callers should report how many such hours they used."""
     out = pd.DataFrame({"da_ozp": da_ozp.tz_convert(EST)})
     lf = lfda.reindex(out.index)
-    out["lfda_final"] = lf["lfda"].notna() & lf["status"].str.lower().eq("final").fillna(False)
+    out["lfda_final"] = lf["lfda"].notna() & lf["status"].astype("string").str.lower().eq("final").fillna(False).astype(bool)
     out["lfda"] = lf["lfda"].fillna(0.0)
     out["oemp"] = out["da_ozp"] + out["lfda"]
     return out

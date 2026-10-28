@@ -5,7 +5,7 @@ authors:
   - family-names: Shah
     given-names: Tirth
     affiliation: Enerwyse
-version: 0.4.0
+version: 0.5.0
 date-released: 2026-10-28
 license: Apache-2.0
 repository-code: "https://github.com/enerwyse/ew-energy-models"
@@ -15,3 +15,4 @@ keywords:
   - global adjustment
   - industrial conservation initiative
   - measurement and verification
+  - electricity prices
