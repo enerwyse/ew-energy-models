@@ -68,9 +68,16 @@ Numbers refer to the catalogue.
 | 16 | Grid carbon-intensity optimization | Research | | |
 | 17 | Battery / storage dispatch optimization | Research | | |
 
-Model 9 deliberately does not include a peak *predictor*. Our analysis found
-that the length of the curtailment window matters more than picking the day
-(see below), so the toolkit focuses on measuring that trade-off openly.
+Model 9 deliberately does not include a peak *predictor*. The toolkit measures
+the trade-off any predictor faces (days curtailed vs peaks caught, and how long
+the daily window must be) so predictors can be compared openly.
+
+> **Correction (v0.5.1).** Versions 0.2.0–0.5.0 took the five highest *hours* of
+> a base period. IESO counts at most **one peak hour per day**, so those versions
+> could count two hours on the same day and miss a peak day. Peak hours are now
+> checked against IESO's official list on every run (19 of 20 match for
+> 2022–2026; see below). Findings published from 0.2.0 about peaks clustering on
+> a single afternoon were wrong and are withdrawn.
 
 ## Ontario Class A cost attribution (v0.5)
 
@@ -104,14 +111,15 @@ and actual GA:
 
 | Site | GA share of Class A commodity bill | Class A vs Class B |
 |---|---|---|
-| 24/7 flat load | 34% | 21% cheaper |
+| 24/7 flat load | 35% | 21% cheaper |
 | Same site, halving its load in the 5 peak hours of 2025 | 21% | 35% cheaper |
-| Two-shift weekday plant (06:00–22:00) | 45% | 0.7% cheaper |
+| Two-shift weekday plant (06:00–22:00) | 45% | 0.2% cheaper |
 
-Halving load for **five hours** in June and August 2025 cut that site's
-August–September 2026 commodity bill by 17%. A site that runs flat out on summer
-afternoons gets almost nothing from Class A. And one kWh used in the 2024–25
-peak hours (all on the late afternoon and evening of June 19, 2024) cost **$27 of GA** over the
+Halving load for **five hours** on five summer days of 2025 (June 23 and 24,
+July 24 and 28, August 11) cut that site's August–September 2026 commodity bill
+by 17%. A site that runs flat out on summer afternoons gets almost nothing from
+Class A. And one kWh used in the 2024–25 peak hours (late afternoons of June 18
+and 19, July 31, August 1 and August 27, 2024) cost **$27 of GA** over the
 nine months of its adjustment period with published actuals, about 480 times
 the average hourly energy price of Aug–Oct 2026. GA was also *negative* from
 December 2025 to February 2026, so Class A sites received GA credits that winter.
@@ -195,15 +203,24 @@ office was above half.
 | Module | What it does |
 |---|---|
 | `ewmodels.data.ieso` | Downloads and parses IESO hourly Ontario demand and the **ICI Demand** reports. Converts hour-ending EST to interval-start timestamps. Caches locally. |
+| `ewmodels.data.ieso_peaks` | Parses IESO's **official Top-5-Peaks workbook** (2010 onward: peak hours and the Total MWh used as the PDF denominator) and compares reproduced peaks against it |
 | `ewmodels.data.ieso_forecast`, `ewmodels.data.ieso_backfill` | Parses IESO's Ontario demand forecasts (Adequacy3) and maintains the **open forecast archive** |
 | `ewmodels.ontario.ici` | Base periods, top-5 peak hours, **Peak Demand Factor** from interval meter data, GA charge, an optional **clean-energy PPA offset**, and curtailment-savings simulation |
 | `ewmodels.ontario.atlas` | **Ontario Peak Atlas**: per-season thresholds, peak timing, and *crowding*, i.e. how many days came within 1–5% of the 5th peak |
 | `ewmodels.ontario.benchmark` | **Open 5CP benchmark**: replays history day by day with no look-ahead and scores any peak-calling strategy on *peaks captured vs. days curtailed*. Supports synthetic or real forecasts, hour-level scoring with a curtailment window, window-length analysis, and a **growth-removed stress test** |
 
-Reproduced peak hours match IESO's own ICI demand reports **25 of 25** for
-2022–2026. In 4 of 5 seasons all five peak hours fell on a single afternoon,
-and catching every peak hour in every season needed a 3–9 pm curtailment
-window. The best 4-hour window caught 85%.
+Reproduced peak hours match IESO's official list for **19 of 20** hours,
+2022–2026. The one difference (Jul 24, 2025: IESO HE17, ours HE19) is a peak
+*day* we got right; IESO ranks hours on real-time data that differs slightly from
+the later hourly demand report. Where IESO has published a base period, the cost
+model uses its official hours and Total MWh.
+
+IESO's official list holds 80 peak hours over 16 base periods (2010–2026), each
+on a different day. Half of them (40) were hour ending 17 EST (5–6 pm daylight
+time). A fixed 4-hour window, HE16–19 EST (4–8 pm daylight time), would have
+caught 84% of them, and every peak in only 5 of 16 seasons. Since 2022 the same
+window caught 19 of 20, and one midday peak (July 6, 2023, HE12) means covering
+every season needed noon to 8 pm.
 
 ### The open 5CP benchmark
 
@@ -253,6 +270,7 @@ Version 1.0.0 will mark a stable API.
 
 | Version | Date | What's in it |
 |---|---|---|
+| [0.5.1](https://github.com/enerwyse/ew-energy-models/releases/tag/v0.5.1) | 2026-11-06 | **Fix:** ICI peak hours now one per day, as IESO counts them; official IESO peak list and PDF denominator; corrected findings |
 | [0.5.0](https://github.com/enerwyse/ew-energy-models/releases/tag/v0.5.0) | 2026-10-28 | Class A cost attribution (Model 3): OEMP + Global Adjustment, Class A vs Class B, GA value of a peak-hour kWh; open IESO price and GA archive |
 | [0.4.0](https://github.com/enerwyse/ew-energy-models/releases/tag/v0.4.0) | 2026-10-28 | M&V (Models 4, 6, 7): change-point baselines with validity checks and self-check, schedule flags, weather normalization, CUSUM drift alarm |
 | [0.3.0](https://github.com/enerwyse/ew-energy-models/releases/tag/v0.3.0) | 2026-10-23 | Facility load analytics (Models 1, 2, 5); spike and meter-outage checks; Building Data Genome 2 loader |

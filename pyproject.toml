@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ew-energy-models"
-version = "0.5.0"
+version = "0.5.1"
 description = "Open, auditable energy-analytics models from Enerwyse: load analytics, M&V baselines, Ontario Global Adjustment / ICI peak tools and Class A cost attribution. Every result ships with an evidence receipt."
 readme = "README.md"
 license = "Apache-2.0"
@@ -23,8 +23,9 @@ classifiers = [
 dependencies = ["numpy>=1.24", "pandas>=2.0"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "openpyxl>=3.1"]
 plot = ["matplotlib>=3.7"]
+ieso = ["openpyxl>=3.1"]
 
 [project.urls]
 Homepage = "https://enerwyse.ca"

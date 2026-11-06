@@ -12,7 +12,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from ewmodels.data.ieso import fetch_demand, fetch_ici_demand
+from ewmodels.data.ieso import fetch_demand
+from ewmodels.data.ieso_peaks import compare_with_official, fetch_top5_peaks
 from ewmodels.ontario import atlas, benchmark, ici
 
 pd.set_option("display.width", 200)
@@ -31,21 +32,19 @@ demand = fetch_demand(range(FIRST, today.year + 1))["ontario_demand_mw"]
 demand = demand[demand.index >= f"{FIRST}-05-01 00:00:00-05:00"]
 print(f"Loaded {len(demand):,} hours, {demand.index.min()} .. {demand.index.max()}")
 
-# 1. Cross-check against IESO's own ICI demand reports ------------------------
-section("1. Cross-check: our peaks vs IESO ICI Demand reports")
+# 1. Cross-check against IESO's official peak-hour list -------------------------
+section("1. Cross-check: reproduced peak hours vs IESO's official Top-5-Peaks list")
 ours = ici.top_peak_hours(demand).value
-try:
-    ici_dem = fetch_ici_demand(range(FIRST, current_bp + 1))["ontario_demand_mw"]
-    theirs = ici.top_peak_hours(ici_dem).value
-    m = ours.merge(theirs, on=["base_period", "rank"], suffixes=("_ours", "_ieso"))
-    m["same_hour"] = m["interval_start_ours"] == m["interval_start_ieso"]
-    m["mw_diff"] = m["demand_mw_ours"] - m["demand_mw_ieso"]
-    print(m[["base_period", "rank", "interval_start_ours", "interval_start_ieso", "same_hour", "mw_diff"]]
-          .to_string(index=False))
-    print(f"\nMatching peak hours: {int(m.same_hour.sum())}/{len(m)}")
-    m.to_csv(OUT / "crosscheck_ici.csv", index=False)
-except Exception as e:  # keep the rest of the run useful
-    print(f"ICI cross-check unavailable: {e!r}")
+official = fetch_top5_peaks(refresh=True)
+m = compare_with_official(ours, official)
+print(m.to_string(index=False))
+print(f"\nMatching peak hours: {int(m.matched.sum())}/{int(m['of'].sum())} "
+      f"(base periods {m.base_period.min()} .. {m.base_period.max()})")
+m.to_csv(OUT / "crosscheck_official.csv", index=False)
+
+section("1b. Official peak hours, all published base periods (hour ending EST)")
+print(official.hour_ending.value_counts().sort_index().to_string())
+official.to_csv(OUT / "ieso_official_peaks.csv", index=False)
 
 # 2. Atlas ---------------------------------------------------------------------
 res = atlas.peak_atlas(demand)

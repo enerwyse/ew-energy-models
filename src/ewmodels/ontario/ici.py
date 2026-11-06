@@ -40,8 +40,14 @@ def base_period_bounds(label: str) -> tuple[pd.Timestamp, pd.Timestamp]:
     return (pd.Timestamp(f"{y}-05-01", tz=EST), pd.Timestamp(f"{y + 1}-05-01", tz=EST))
 
 
-def top_peak_hours(ontario_demand_mw: pd.Series, n: int = N_PEAKS) -> Result[pd.DataFrame]:
+def top_peak_hours(ontario_demand_mw: pd.Series, n: int = N_PEAKS, one_per_day: bool = True) -> Result[pd.DataFrame]:
     """Top-n Ontario-demand hours per base period.
+
+    IESO counts at most one peak hour per day: the five peak hours are the
+    highest hour of each of the five highest-demand days (EST calendar days).
+    IESO's published 2025-2026 list (Jun 24 HE19, Aug 11 HE18, Jun 23 HE19,
+    Jul 24 HE17, Jul 28 HE16) skips higher second hours on Jun 23 and Jun 24.
+    one_per_day=False gives the plain top-n hours (versions <= 0.5.0 did this: a bug).
 
     Returns a frame with columns base_period, rank, interval_start, demand_mw,
     complete (whether the base period has full hourly coverage — an incomplete
@@ -58,7 +64,11 @@ def top_peak_hours(ontario_demand_mw: pd.Series, n: int = N_PEAKS) -> Result[pd.
         start, end = base_period_bounds(label)
         expected = int((end - start) / pd.Timedelta(hours=1))
         coverage[label] = len(grp) / expected
-        top = grp.nlargest(n)
+        if one_per_day:
+            daily_max = grp.groupby(grp.index.date).idxmax()
+            top = grp.loc[daily_max.to_numpy()].nlargest(n)
+        else:
+            top = grp.nlargest(n)
         for rank, (ts, mw) in enumerate(top.items(), start=1):
             rows.append(
                 {"base_period": label, "rank": rank, "interval_start": ts, "demand_mw": mw,
@@ -74,7 +84,7 @@ def top_peak_hours(ontario_demand_mw: pd.Series, n: int = N_PEAKS) -> Result[pd.
     partial = [k for k, v in coverage.items() if v < 0.999]
     if partial:
         caveats.append(f"Incomplete base periods (provisional peaks): {', '.join(partial)}")
-    receipt = make_receipt("ontario.ici.top_peak_hours", s, parameters={"n": n},
+    receipt = make_receipt("ontario.ici.top_peak_hours", s, parameters={"n": n, "one_per_day": one_per_day},
                            checks=checks, caveats=caveats)
     receipt.parameters["coverage"] = {k: round(v, 4) for k, v in coverage.items()}
     return Result(table, receipt)

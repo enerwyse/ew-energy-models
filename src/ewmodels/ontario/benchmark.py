@@ -223,7 +223,7 @@ def normalize_seasons(ontario_demand_mw: pd.Series, method: str = "mean",
     if method == "mean":
         stat = s.groupby(labels).mean()
     elif method == "threshold":
-        stat = s.groupby(labels).apply(lambda g: g.nlargest(N_PEAKS).iloc[-1])
+        stat = s.groupby(labels).apply(lambda g: g.groupby(g.index.date).max().nlargest(N_PEAKS).iloc[-1])
     else:
         raise ValueError("method must be 'mean' or 'threshold'")
     # Partial seasons have biased stats (e.g. summer-only means), so they reuse the

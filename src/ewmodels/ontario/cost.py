@@ -53,22 +53,40 @@ def _ga_month(ga: pd.DataFrame, month: str) -> tuple[float, float, str]:
     return float("nan"), float("nan"), "missing"
 
 
-def peak_hour_value(ontario_demand_mw: pd.Series, ga: pd.DataFrame) -> Result[pd.DataFrame]:
+def _peaks_with_official(ontario_demand_mw: pd.Series, official: pd.DataFrame | None):
+    """Reproduced peaks, with IESO's official hours and Total (MWh) swapped in where published.
+    Returns (Result of top_peak_hours, frame with a 'denominator' column and 'source')."""
+    peaks = ici.top_peak_hours(ontario_demand_mw)
+    p = peaks.value.assign(denominator=peaks.value["demand_mw"], source="reproduced")
+    if official is not None and len(official):
+        off = official.rename(columns={"total_mwh": "denominator"})[
+            ["base_period", "rank", "interval_start", "denominator"]].assign(
+            demand_mw=lambda d: d["denominator"], complete=True, source="IESO official")
+        p = pd.concat([p[~p["base_period"].isin(off["base_period"])], off], ignore_index=True)
+        p = p.sort_values(["base_period", "rank"]).reset_index(drop=True)
+    return peaks, p
+
+
+def peak_hour_value(ontario_demand_mw: pd.Series, ga: pd.DataFrame,
+                    official: pd.DataFrame | None = None) -> Result[pd.DataFrame]:
     """GA dollars per MWh consumed in a base period's peak hours, over its adjustment period.
 
-    For each base period with peaks: $/MWh_at_peak = Σ_adjustment months GA_total / Σ_peaks Ontario MWh.
+    For each base period with peaks: $/MWh_at_peak = Σ_adjustment months GA_total / Σ_peaks system MWh.
+    official: IESO's Top-5-Peaks table (data.ieso_peaks); where it covers a base period, its peak
+        hours and Total (MWh) replace the reproduced hours and the Ontario Demand approximation.
     Only months with an actual or second-estimate GA are summed; `months_with_ga` says how many of 12.
     """
-    peaks = ici.top_peak_hours(ontario_demand_mw)
+    peaks, table_peaks = _peaks_with_official(ontario_demand_mw, official)
     rows = []
-    for bp, grp in peaks.value.groupby("base_period"):
+    for bp, grp in table_peaks.groupby("base_period"):
         y = int(bp.split("-")[1])
         months = [f"{yy}-{mm:02d}" for yy, mm in [(y, m) for m in range(7, 13)] + [(y + 1, m) for m in range(1, 7)]]
         vals = [_ga_month(ga, m) for m in months]
         used = [(m, v) for m, v in zip(months, vals) if v[2] != "missing"]
         ga_sum = sum(v[0] for _, v in used)
-        sys_mwh = float(grp["demand_mw"].sum())  # 1-h intervals: MW == MWh
-        rows.append({"base_period": bp, "peaks_complete": bool(grp["complete"].all()),
+        sys_mwh = float(grp["denominator"].sum())  # 1-h intervals: MW == MWh
+        rows.append({"base_period": bp, "peaks_source": grp["source"].iloc[0],
+                     "peaks_complete": bool(grp["complete"].all()),
                      "adjustment_period": f"{y}-07 .. {y + 1}-06", "months_with_ga": len(used),
                      "ga_total_dollars": ga_sum, "system_peak_mwh": sys_mwh,
                      "dollars_per_mwh_at_peak": ga_sum / sys_mwh if used else float("nan"),
@@ -77,20 +95,29 @@ def peak_hour_value(ontario_demand_mw: pd.Series, ga: pd.DataFrame) -> Result[pd
     checks = list(peaks.receipt.checks) + [
         Check("ga_available", bool((table["months_with_ga"] > 0).any()),
               f"GA months per base period: {dict(zip(table.base_period, table.months_with_ga))}")]
-    caveats = list(peaks.receipt.caveats) + [_DENOM_CAVEAT, _GA_CAVEAT,
+    caveats = list(peaks.receipt.caveats) + [_GA_CAVEAT,
         "Partial adjustment periods (months_with_ga < 12) understate the full-year value."]
+    if (table["peaks_source"] == "reproduced").any():
+        caveats.append(_DENOM_CAVEAT + " Applies to base periods with peaks_source 'reproduced'.")
     receipt = make_receipt("ontario.cost.peak_hour_value", ontario_demand_mw, checks=checks, caveats=caveats)
     return Result(table, receipt)
 
 
-def site_pdf(site_kwh: pd.Series, ontario_demand_mw: pd.Series) -> Result[dict]:
-    """Estimated PDF per base period from a site's meter data and Ontario demand."""
-    peaks = ici.top_peak_hours(ontario_demand_mw).value
-    out, checks, caveats = {}, [], [_DENOM_CAVEAT]
+def site_pdf(site_kwh: pd.Series, ontario_demand_mw: pd.Series,
+             official: pd.DataFrame | None = None) -> Result[dict]:
+    """PDF per base period from a site's meter data. With `official` (IESO's Top-5-Peaks table),
+    published base periods use IESO's peak hours and Total (MWh) denominator; others are estimates
+    from Ontario demand."""
+    _, peaks = _peaks_with_official(ontario_demand_mw, official)
+    out, checks, caveats = {}, [], []
     for bp, grp in peaks.groupby("base_period"):
         hours = pd.DatetimeIndex(grp["interval_start"])
-        sysm = pd.Series(grp["demand_mw"].to_numpy(), index=hours)
-        r = ici.peak_demand_factor(site_kwh, hours, sysm, denominator_source="ontario_demand")
+        sysm = pd.Series(grp["denominator"].to_numpy(), index=hours)
+        is_official = grp["source"].iloc[0] == "IESO official"
+        if not is_official and _DENOM_CAVEAT not in caveats:
+            caveats.append(_DENOM_CAVEAT)
+        r = ici.peak_demand_factor(site_kwh, hours, sysm,
+                                   denominator_source="ieso_published" if is_official else "ontario_demand")
         if r.receipt.valid:
             out[bp] = r.value
         checks.append(Check(f"pdf_{bp}", r.receipt.valid,
@@ -173,7 +200,8 @@ def bill_breakdown(
                "Energy priced at OEMP for both classes; LFDA treated as 0 where not yet final "
                "(see hours_lfda_not_final)."]
     if isinstance(pdf, dict):
-        caveats.append(_DENOM_CAVEAT)
+        caveats.append("PDFs from site_pdf(): official where IESO has published the base period's peaks, "
+                       "estimated otherwise (see that receipt).")
     receipt = make_receipt("ontario.cost.bill_breakdown", site_kwh,
                            parameters={"delivery": delivery, "pdf": pdf}, checks=checks, caveats=caveats)
     return Result(table, receipt)

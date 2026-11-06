@@ -4,7 +4,7 @@ import pytest
 from ewmodels.data.ieso import EST
 from ewmodels.ontario import atlas, benchmark, ici
 
-from .conftest import PLANTED
+from .conftest import PLANTED, SAME_DAY_DISTRACTOR
 
 
 def test_base_period_labels():
@@ -21,6 +21,10 @@ def test_top_peak_hours_finds_planted(demand):
     assert [str(t) for t in first.interval_start.dt.strftime("%Y-%m-%d %H:%M")] == [t for t, _ in PLANTED]
     assert first["complete"].all()
     assert res.receipt.valid
+    # the plain top-5 hours would include a second hour on 2023-07-05
+    plain = ici.top_peak_hours(demand, one_per_day=False).value
+    plain = plain[plain.base_period == "2023-2024"].interval_start.dt.strftime("%Y-%m-%d %H:%M").tolist()
+    assert SAME_DAY_DISTRACTOR[0] in plain
     assert res.receipt.resolution == "0 days 01:00:00"
 
 
@@ -69,9 +73,9 @@ def test_curtailment_savings(demand):
 def test_atlas_summary(demand):
     a = atlas.peak_atlas(demand).value
     row = a["summary"].set_index("base_period").loc["2023-2024"]
-    assert row.threshold_mw == 24200.0
-    assert row.distinct_peak_days == 4  # two peak hours fell on 2023-07-05
-    assert row.days_within_1pct == 4
+    assert row.threshold_mw == 24150.0
+    assert row.distinct_peak_days == 5  # IESO counts one peak hour per day
+    assert row.days_within_1pct == 5
     assert a["by_month"].sum() == 10
 
 
@@ -111,7 +115,7 @@ def test_window_scoring(demand):
     # 2023-2024 planted peaks start at 15:00-17:00 EST; 2024-2025 at 16:00-17:00
     always = lambda ctx: True
     narrow = benchmark.evaluate(demand, always, window=(16, 1)).value.set_index("base_period")
-    assert narrow.loc["2023-2024", "peak_hours_captured"] == 2   # the two 16:00 peaks
+    assert narrow.loc["2023-2024", "peak_hours_captured"] == 3   # the three 16:00 peaks
     wide = benchmark.evaluate(demand, always, window=(15, 3)).value
     assert (wide.capture_rate == 1.0).all()
     fast = benchmark.tradeoff_curve(demand, margins=(0.99,), forecast_errors_pct=(0.0,), window=(16, 1))

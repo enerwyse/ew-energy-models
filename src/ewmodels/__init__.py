@@ -7,5 +7,5 @@ passed, and which caveats apply. Numbers without evidence are not results.
 
 from ewmodels.receipts import Check, Receipt, Result
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 __all__ = ["Check", "Receipt", "Result", "__version__"]

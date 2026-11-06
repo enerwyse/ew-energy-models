@@ -13,6 +13,7 @@ from pathlib import Path
 import pandas as pd
 
 from ewmodels.data.ieso import EST, fetch_demand
+from ewmodels.data.ieso_peaks import fetch_top5_peaks
 from ewmodels.data.ieso_prices import fetch_lfda, load_da_prices, load_ga, oemp
 from ewmodels.ontario import cost, ici
 
@@ -29,6 +30,7 @@ def section(title):
 demand = fetch_demand(range(2024, today.year + 1))["ontario_demand_mw"]
 demand = demand[demand.index >= "2024-05-01 00:00:00-05:00"]
 ga = load_ga("data/ieso_ga_archive.csv")
+official = fetch_top5_peaks(refresh=True)
 da = load_da_prices("data/ieso_da_price_archive.csv")
 px = oemp(da, fetch_lfda(sorted({da.index.min().year, da.index.max().year})))
 print(f"Demand {demand.index.min():%Y-%m-%d} .. {demand.index.max():%Y-%m-%d}; "
@@ -37,9 +39,9 @@ print(f"Demand {demand.index.min():%Y-%m-%d} .. {demand.index.max():%Y-%m-%d}; "
 
 # 1. What one MWh in a peak hour costs ------------------------------------------------
 section("1. GA paid per MWh consumed in a base period's 5 peak hours")
-peaks = ici.top_peak_hours(demand).value
-print(peaks[["base_period", "rank", "interval_start", "demand_mw"]].to_string(index=False))
-phv = cost.peak_hour_value(demand, ga)
+peaks = official[official.base_period >= "2024"]
+print(peaks[["base_period", "rank", "interval_start", "hour_ending", "total_mwh"]].to_string(index=False))
+phv = cost.peak_hour_value(demand, ga, official=official)
 t = phv.value
 t["per_month_avg"] = t["ga_total_dollars"] / t["months_with_ga"].where(t["months_with_ga"] > 0)
 t["dollars_per_kwh_at_peak"] = t["dollars_per_mwh_at_peak"] / 1000
@@ -68,7 +70,7 @@ sites = {"24/7 flat": flat, "two-shift weekdays": shift, "24/7, curtails 50% at 
 section("2. Monthly commodity bill, Class A vs Class B (full months with prices and GA)")
 rows = []
 for name, kwh in sites.items():
-    pdf = cost.site_pdf(kwh, demand)
+    pdf = cost.site_pdf(kwh, demand, official=official)
     res = cost.bill_breakdown(kwh, px, ga, pdf.value)
     b = res.value
     b.insert(0, "site", name)

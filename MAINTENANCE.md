@@ -84,8 +84,9 @@ The base period closes April 30. IESO publishes the final ICI demand file in ear
    ```bash
    python examples/ontario_peak_atlas.py | tee out/run_output.txt
    ```
-3. Check section 1: **Matching peak hours should be 25/25** (or 5 more each year).
-   If any mismatch appears, stop and investigate before publishing anything.
+3. Check section 1: reproduced vs IESO's **official** peak list. Expect 19/20 for 2022–2026
+   (one known real-time vs report difference, Jul 24 2025), plus 5 more each year once IESO
+   publishes the new base period. Any *new* mismatch: stop and investigate before publishing.
 4. Note the new season's peak date, threshold, crowding and window coverage.
 5. Once a full summer of the forecast archive exists (first time: May 2027), run the
    benchmark on real IESO forecasts (ask Claude to wire it in).
@@ -97,6 +98,8 @@ The base period closes April 30. IESO publishes the final ICI demand file in ear
 
 1. Update the version in **three places**: `pyproject.toml`, `src/ewmodels/__init__.py`,
    `CITATION.cff` (plus `date-released`).
+   Then update **CHANGELOG.md** (move "Unreleased" items under the new version and date)
+   and the **README**: the model status table and the "Versions" table.
 2. `pytest -q` must pass.
 3. Commit and push:
    ```bash

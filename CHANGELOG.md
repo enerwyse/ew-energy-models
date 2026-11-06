@@ -5,6 +5,34 @@ All notable changes to `ew-energy-models`. Versions follow
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-06
+
+### Fixed
+- **ICI peak hours counted more than one hour per day.** IESO's five peak hours are the
+  highest hour of each of the five highest-demand days. `ici.top_peak_hours()` took the
+  five highest hours, so versions 0.2.0–0.5.0 could count two hours on one day and miss a
+  peak day (2025–26: Jun 23 and Jun 24 counted twice; Jul 24 and Jul 28 missed). Now
+  `one_per_day=True` by default; `one_per_day=False` reproduces the old behaviour.
+  Affects the Peak Atlas, window coverage, the 5CP benchmark, PDFs and cost attribution.
+- The old "25/25" cross-check was circular: it applied the same top-5 method to two IESO
+  demand series. It is replaced by a check against IESO's official peak list.
+- Season normalization (`normalize_seasons(method="threshold")`) uses the 5th peak *day*.
+
+### Added
+- `ewmodels.data.ieso_peaks`: parser for IESO's official Top-5-Peaks workbook (2010
+  onward), `fetch_top5_peaks()` and `compare_with_official()`. Optional extra:
+  `pip install "ew-energy-models[ieso]"` (openpyxl).
+- `cost.peak_hour_value()` and `cost.site_pdf()` accept `official=`: published base
+  periods use IESO's official peak hours and Total (MWh) as the PDF denominator.
+
+### Corrected findings
+- Withdrawn: "in 4 of 5 seasons all five peak hours fell on a single afternoon" and "a
+  3–9 pm window was needed; the best 4-hour window caught 85%".
+- Now (IESO official list): reproduced peaks match 19 of 20 hours for 2022–2026. Over 16
+  seasons, 40 of 80 peak hours were HE17 EST; HE16–19 EST caught 84% (95% since 2022).
+- Cost example: two-shift plant gains 0.2% from Class A (was 0.7%); other figures within
+  one percentage point.
+
 ## [0.5.0] - 2026-10-28
 
 Ontario Class A cost attribution (catalogue Model 3, re-scoped from time-of-use).
@@ -89,7 +117,8 @@ Ontario ICI toolkit (catalogue Models 9, 10). First public release.
   (`ewmodels.resolution`).
 - Trusted Publishing to PyPI from GitHub releases.
 
-[Unreleased]: https://github.com/enerwyse/ew-energy-models/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/enerwyse/ew-energy-models/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/enerwyse/ew-energy-models/releases/tag/v0.5.1
 [0.5.0]: https://github.com/enerwyse/ew-energy-models/releases/tag/v0.5.0
 [0.4.0]: https://github.com/enerwyse/ew-energy-models/releases/tag/v0.4.0
 [0.3.0]: https://github.com/enerwyse/ew-energy-models/releases/tag/v0.3.0
